@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "draw.h"
 #include "game.h"
 
 #define XO_STATUS_FILE "/sys/module/kxo/initstate"
@@ -89,6 +90,28 @@ static void listen_keyboard_handler(void)
     close(attr_fd);
 }
 
+static void draw_board(char *display_buf, const char *board_info)
+{
+    int i = 0, k = 0;
+    display_buf[i++] = '\n';
+    display_buf[i++] = '\n';
+
+    while (i < DRAWBUFFER_SIZE) {
+        for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
+            display_buf[i++] =
+                j & 1 ? '|' : DRAW_XO_GET_SYMB(board_info[k >> 2], (k & 0x3));
+            if (j & 1)
+                k++;
+        }
+        display_buf[i++] = '\n';
+        for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++) {
+            display_buf[i++] = '-';
+        }
+        display_buf[i++] = '\n';
+    }
+    display_buf[i - 1] = '\0';
+}
+
 #if MEASURE_MODE
 long measured_time[MEASURE_COUNT];
 #endif
@@ -103,6 +126,7 @@ int main(int argc, char *argv[])
     fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
 
     char display_buf[DRAWBUFFER_SIZE];
+    unsigned char board_info[N_GRIDS >> 2];
 
     fd_set readset;
     int device_fd = open(XO_DEVICE_FILE, O_RDONLY);
@@ -138,7 +162,7 @@ int main(int argc, char *argv[])
             long elapsed_time = 0;
 
             clock_gettime(CLOCK_MONOTONIC, &start);
-            len = read(device_fd, display_buf, DRAWBUFFER_SIZE);
+            len = read(device_fd, board_info, N_GRIDS >> 2);
             clock_gettime(CLOCK_MONOTONIC, &end);
 
             if (len > 0) {
@@ -153,6 +177,7 @@ int main(int argc, char *argv[])
                     end_attr = true;
             }
 
+            draw_board(display_buf, board_info);
             printf("%s\n", display_buf);
             printf("Current measured time: %ld us\n", elapsed_time);
             printf("Remaining measurements: %d\n", MEASURE_COUNT - measure_idx);

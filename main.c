@@ -11,6 +11,7 @@
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 
+#include "draw.h"
 #include "game.h"
 #include "mcts.h"
 #include "negamax.h"
@@ -78,7 +79,7 @@ static int major;
 static struct class *kxo_class;
 static struct cdev kxo_cdev;
 
-static char draw_buffer[DRAWBUFFER_SIZE];
+static unsigned char draw_buffer[N_GRIDS >> 2];
 
 /* Data are stored into a kfifo buffer before passing them to the userspace */
 static DECLARE_KFIFO_PTR(rx_fifo, unsigned char);
@@ -120,29 +121,14 @@ static char table[N_GRIDS];
 /* Draw the board into draw_buffer */
 static int draw_board(char *table)
 {
-    int i = 0, k = 0;
-    draw_buffer[i++] = '\n';
-    smp_wmb();
-    draw_buffer[i++] = '\n';
-    smp_wmb();
+    int i = 0;
+    memset(draw_buffer, 0, sizeof(draw_buffer));
 
-    while (i < DRAWBUFFER_SIZE) {
-        for (int j = 0; j < (BOARD_SIZE << 1) - 1 && k < N_GRIDS; j++) {
-            draw_buffer[i++] = j & 1 ? '|' : table[k++];
-            smp_wmb();
-        }
-        draw_buffer[i++] = '\n';
+    while (i < N_GRIDS) {
+        DRAW_XO(draw_buffer[(i >> 2)], table[i], (i & 0x3));
         smp_wmb();
-        for (int j = 0; j < (BOARD_SIZE << 1) - 1; j++) {
-            draw_buffer[i++] = '-';
-            smp_wmb();
-        }
-        draw_buffer[i++] = '\n';
-        smp_wmb();
+        i++;
     }
-
-    draw_buffer[i - 1] = '\0';
-    smp_wmb();
 
     return 0;
 }
