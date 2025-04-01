@@ -141,6 +141,8 @@ static int draw_board(char *table)
         smp_wmb();
     }
 
+    draw_buffer[i - 1] = '\0';
+    smp_wmb();
 
     return 0;
 }
